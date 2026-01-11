@@ -47,7 +47,6 @@ npm run format
 
 ```
 src/
-├── components/      # UI components
 ├── templates/       # Template definitions
 ├── state/           # App state management
 ├── utils/           # Utility functions

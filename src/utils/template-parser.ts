@@ -17,15 +17,14 @@ const VARIABLE_REGEX = /\{\{([^}]+)\}\}/g;
 export function parseTemplate(template: string): ParsedTemplate {
 	const placeholders: TemplatePlaceholder[] = [];
 
-	const regex = new RegExp(VARIABLE_REGEX);
-	let match = regex.exec(template);
+	let match = VARIABLE_REGEX.exec(template);
 	while (match !== null) {
 		placeholders.push({
 			start: match.index,
 			end: match.index + match[0].length,
 			name: match[1].trim(),
 		});
-		match = regex.exec(template);
+		match = VARIABLE_REGEX.exec(template);
 	}
 
 	return {

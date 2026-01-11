@@ -57,6 +57,8 @@ export class App {
             class="search-bar"
             placeholder="Search templates..."
             id="search-input"
+            disabled
+            title="Search functionality coming soon"
           />
         </div>
         <div class="template-categories">

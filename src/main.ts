@@ -7,4 +7,9 @@ import "./styles/preview.css";
 import { App } from "./app";
 
 const app = new App();
-app.mount(document.getElementById("app")!);
+const appElement = document.getElementById("app");
+if (appElement) {
+	app.mount(appElement);
+} else {
+	throw new Error("App element not found");
+}
