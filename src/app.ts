@@ -10,20 +10,74 @@ marked.setOptions({
 
 export class App {
 	private container: HTMLElement | null = null;
+	private editorElement: HTMLTextAreaElement | null = null;
+	private previewElement: HTMLElement | null = null;
+	private lastEditorContent: string = "";
+	private lastTemplateId: string | null = null;
+	private lastSidebarCollapsed: boolean = false;
 
 	mount(element: HTMLElement) {
 		this.container = element;
 		this.render();
 
-		// Restore previous state
+		// Initialize tracking variables after initial render
+		const currentTemplate = appState.getCurrentTemplate();
+		this.lastTemplateId = currentTemplate?.id ?? null;
+		this.lastSidebarCollapsed = appState.isSidebarCollapsed();
+		this.lastEditorContent = appState.getEditorContent();
+
+		// Restore previous state (this may trigger a state change)
 		appState.restore(allTemplates);
 
+		// Update tracking variables after restore
+		const restoredTemplate = appState.getCurrentTemplate();
+		this.lastTemplateId = restoredTemplate?.id ?? null;
+		this.lastSidebarCollapsed = appState.isSidebarCollapsed();
+		this.lastEditorContent = appState.getEditorContent();
+
 		// Subscribe to state changes
-		appState.subscribe(() => this.render());
+		appState.subscribe(() => this.handleStateChange());
+	}
+
+	private handleStateChange() {
+		const currentTemplate = appState.getCurrentTemplate();
+		const currentTemplateId = currentTemplate?.id ?? null;
+		const currentSidebarCollapsed = appState.isSidebarCollapsed();
+		const currentEditorContent = appState.getEditorContent();
+
+		// Check if template or sidebar state changed (requires full re-render)
+		const templateChanged = currentTemplateId !== this.lastTemplateId;
+		const sidebarChanged = currentSidebarCollapsed !== this.lastSidebarCollapsed;
+
+		if (templateChanged || sidebarChanged) {
+			// Full re-render needed
+			this.render();
+			this.lastTemplateId = currentTemplateId;
+			this.lastSidebarCollapsed = currentSidebarCollapsed;
+			this.lastEditorContent = currentEditorContent;
+		} else if (currentEditorContent !== this.lastEditorContent) {
+			// Only editor content changed - update preview only
+			this.updatePreview(currentEditorContent);
+			this.lastEditorContent = currentEditorContent;
+		}
+	}
+
+	private updatePreview(content: string) {
+		if (!this.previewElement) return;
+
+		const html = marked.parse(content) as string;
+		const sanitized = DOMPurify.sanitize(html);
+
+		this.previewElement.innerHTML = sanitized || '<p style="color: var(--text-muted);">Preview will appear here...</p>';
 	}
 
 	private render() {
 		if (!this.container) return;
+
+		const editorBefore = this.editorElement;
+		const hadFocus = editorBefore === document.activeElement;
+		const selectionStart = editorBefore?.selectionStart ?? -1;
+		const selectionEnd = editorBefore?.selectionEnd ?? -1;
 
 		const editorContent = appState.getEditorContent();
 
@@ -35,7 +89,33 @@ export class App {
       </div>
     `;
 
+		// Store references to editor and preview elements
+		this.editorElement = document.getElementById("editor") as HTMLTextAreaElement | null;
+		this.previewElement = document.querySelector(".preview-pane") as HTMLElement | null;
+
+		// Restore editor value and focus if it had focus before
+		if (this.editorElement && hadFocus) {
+			this.editorElement.value = editorContent;
+			// Restore selection if we had one
+			if (selectionStart >= 0 && selectionEnd >= 0) {
+				this.editorElement.selectionStart = selectionStart;
+				this.editorElement.selectionEnd = selectionEnd;
+			}
+			// Restore focus after a brief delay to ensure DOM is ready
+			setTimeout(() => {
+				if (this.editorElement) {
+					this.editorElement.focus();
+				}
+			}, 0);
+		}
+
 		this.attachEventListeners();
+
+		// Update state tracking
+		const currentTemplate = appState.getCurrentTemplate();
+		this.lastTemplateId = currentTemplate?.id ?? null;
+		this.lastSidebarCollapsed = appState.isSidebarCollapsed();
+		this.lastEditorContent = editorContent;
 	}
 
 	private renderSidebar(): string {
@@ -96,7 +176,6 @@ export class App {
 
 	private renderEditor(): string {
 		const currentTemplate = appState.getCurrentTemplate();
-		const editorContent = appState.getEditorContent();
 
 		return `
       <div class="editor-pane">
@@ -136,7 +215,10 @@ export class App {
 			if (!categories[template.category]) {
 				categories[template.category] = [];
 			}
-			categories[template.category].push(template);
+			const categoryArray = categories[template.category];
+			if (categoryArray) {
+				categoryArray.push(template);
+			}
 		}
 
 		return categories;
