@@ -35,6 +35,9 @@ export class App {
 		this.lastSidebarCollapsed = appState.isSidebarCollapsed();
 		this.lastEditorContent = appState.getEditorContent();
 
+		// Apply restored pane sizes
+		this.applyPaneSizes();
+
 		// Subscribe to state changes
 		appState.subscribe(() => this.handleStateChange());
 	}
@@ -84,10 +87,15 @@ export class App {
 		this.container.innerHTML = `
       <div class="container">
         ${this.renderSidebar()}
+        <div class="resize-handle resize-handle-sidebar" data-resize="sidebar"></div>
         ${this.renderEditor()}
+        <div class="resize-handle resize-handle-editor" data-resize="editor"></div>
         ${this.renderPreview(editorContent)}
       </div>
     `;
+
+		// Apply pane sizes via CSS custom properties
+		this.applyPaneSizes();
 
 		// Store references to editor and preview elements
 		this.editorElement = document.getElementById("editor") as HTMLTextAreaElement | null;
@@ -225,6 +233,9 @@ export class App {
 	}
 
 	private attachEventListeners() {
+		// Resize handles
+		this.attachResizeHandlers();
+
 		// Template selection
 		const templateCards = document.querySelectorAll(".template-card");
 		for (const card of templateCards) {
@@ -293,5 +304,100 @@ export class App {
 				}
 			});
 		}
+	}
+
+	private attachResizeHandlers() {
+		const sidebarHandle = document.querySelector(
+			".resize-handle-sidebar",
+		) as HTMLElement;
+		const editorHandle = document.querySelector(
+			".resize-handle-editor",
+		) as HTMLElement;
+
+		if (sidebarHandle) {
+			this.setupResizeHandler(sidebarHandle, "sidebar");
+		}
+
+		if (editorHandle) {
+			this.setupResizeHandler(editorHandle, "editor");
+		}
+	}
+
+	private applyPaneSizes() {
+		const container = this.container?.querySelector(".container") as HTMLElement;
+		if (container) {
+			const paneSizes = appState.getPaneSizes();
+			container.style.setProperty("--sidebar-width", `${paneSizes.sidebarWidth}px`);
+			container.style.setProperty("--editor-width", `${paneSizes.editorWidth}%`);
+		}
+	}
+
+	private setupResizeHandler(handle: HTMLElement, type: "sidebar" | "editor") {
+		let isResizing = false;
+		let startX = 0;
+		let startWidth = 0;
+
+		const handleMouseDown = (e: MouseEvent) => {
+			isResizing = true;
+			startX = e.clientX;
+			const paneSizes = appState.getPaneSizes();
+			startWidth = paneSizes.sidebarWidth;
+
+			document.addEventListener("mousemove", handleMouseMove);
+			document.addEventListener("mouseup", handleMouseUp);
+			document.body.style.cursor = "col-resize";
+			document.body.style.userSelect = "none";
+			e.preventDefault();
+		};
+
+		const handleMouseMove = (e: MouseEvent) => {
+			if (!isResizing) return;
+
+			const container = this.container?.querySelector(
+				".container",
+			) as HTMLElement;
+			if (!container) return;
+
+			const containerRect = container.getBoundingClientRect();
+			const deltaX = e.clientX - startX;
+
+			if (type === "sidebar") {
+				const newWidth = startWidth + deltaX;
+				const minWidth = 200;
+				const maxWidth = containerRect.width * 0.5; // Max 50% of container
+				const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+				appState.updatePaneSizes({ sidebarWidth: clampedWidth });
+				container.style.setProperty("--sidebar-width", `${clampedWidth}px`);
+			} else if (type === "editor") {
+				// Calculate editor width as percentage of remaining space
+				const sidebarWidth = appState.getPaneSizes().sidebarWidth;
+				const availableWidth = containerRect.width - sidebarWidth;
+				const editorStartX = sidebarWidth;
+				const mouseX = e.clientX - containerRect.left;
+				const editorWidthPx = mouseX - editorStartX;
+				const editorWidthPercent = (editorWidthPx / availableWidth) * 100;
+
+				const minPercent = 20;
+				const maxPercent = 80;
+				const clampedPercent = Math.max(
+					minPercent,
+					Math.min(maxPercent, editorWidthPercent),
+				);
+
+				appState.updatePaneSizes({ editorWidth: clampedPercent });
+				container.style.setProperty("--editor-width", `${clampedPercent}%`);
+			}
+		};
+
+		const handleMouseUp = () => {
+			isResizing = false;
+			document.removeEventListener("mousemove", handleMouseMove);
+			document.removeEventListener("mouseup", handleMouseUp);
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+		};
+
+		handle.addEventListener("mousedown", handleMouseDown);
 	}
 }
