@@ -1,0 +1,6 @@
+{
+	"scripts": {
+		"setup": "",
+		"run": "concurrently \"npm run server\" \"npm run worker\""
+	}
+}

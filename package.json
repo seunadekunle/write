@@ -1,0 +1,30 @@
+{
+	"name": "cayenne",
+	"private": true,
+	"version": "2.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"concurrently": "^9.2.1",
+		"typescript": "^5.6.3",
+		"vite": "^6.0.3"
+	},
+	"dependencies": {
+		"@codemirror/lang-javascript": "^6.2.2",
+		"@codemirror/lang-markdown": "^6.3.2",
+		"@codemirror/state": "^6.4.1",
+		"@codemirror/view": "^6.35.0",
+		"codemirror": "^6.0.1",
+		"dompurify": "^3.2.3",
+		"fuse.js": "^7.0.0",
+		"marked": "^15.0.4"
+	}
+}
