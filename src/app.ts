@@ -142,6 +142,16 @@ export class App {
 		return categories;
 	}
 
+	private updatePreview(content: string) {
+		const preview = document.querySelector(".preview-pane");
+		if (!preview) return;
+
+		const html = marked.parse(content) as string;
+		const sanitized = DOMPurify.sanitize(html);
+		preview.innerHTML =
+			sanitized || '<p style="color: var(--text-muted);">Preview will appear here...</p>';
+	}
+
 	private attachEventListeners() {
 		// Template selection
 		const templateCards = document.querySelectorAll(".template-card");
@@ -164,6 +174,11 @@ export class App {
 			editor.value = appState.getEditorContent();
 
 			editor.addEventListener("input", () => {
+				this.updatePreview(editor.value);
+			});
+
+			// Save content when editor loses focus
+			editor.addEventListener("blur", () => {
 				appState.updateEditorContent(editor.value);
 			});
 
@@ -175,7 +190,7 @@ export class App {
 					const end = editor.selectionEnd;
 					editor.value = `${editor.value.substring(0, start)}  ${editor.value.substring(end)}`;
 					editor.selectionStart = editor.selectionEnd = start + 2;
-					appState.updateEditorContent(editor.value);
+					this.updatePreview(editor.value);
 				}
 			});
 		}
@@ -184,7 +199,8 @@ export class App {
 		const copyBtn = document.getElementById("copy-btn");
 		if (copyBtn) {
 			copyBtn.addEventListener("click", () => {
-				const content = appState.getEditorContent();
+				const editor = document.getElementById("editor") as HTMLTextAreaElement;
+				const content = editor?.value || appState.getEditorContent();
 				navigator.clipboard
 					.writeText(content)
 					.then(() => {
@@ -207,6 +223,10 @@ export class App {
 		if (clearBtn) {
 			clearBtn.addEventListener("click", () => {
 				if (confirm("Clear current template and start fresh?")) {
+					const editor = document.getElementById("editor") as HTMLTextAreaElement;
+					if (editor) {
+						editor.value = "";
+					}
 					appState.clearTemplate();
 				}
 			});
