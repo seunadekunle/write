@@ -7,16 +7,32 @@ export interface AppStateData {
 	editorContent: string;
 	variableValues: Record<string, string>;
 	sidebarCollapsed: boolean;
+	paneSizes?: PaneSizes;
+}
+
+export interface PaneSizes {
+	sidebarWidth: number;
+	editorWidth: number;
 }
 
 const STORAGE_KEY = "cayenne_state";
+const PANE_SIZES_KEY = "cayenne_pane_sizes";
 const DEBOUNCE_MS = 300;
+
+const DEFAULT_SIDEBAR_WIDTH = 250;
+const DEFAULT_EDITOR_WIDTH = 50; // percentage of remaining space
+const MIN_SIDEBAR_WIDTH = 200;
+const MIN_PANE_WIDTH = 300;
 
 export class AppState {
 	private currentTemplate: Template | null = null;
 	private editorContent = "";
 	private variableValues: Record<string, string> = {};
 	private sidebarCollapsed = false;
+	private paneSizes: PaneSizes = {
+		sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+		editorWidth: DEFAULT_EDITOR_WIDTH,
+	};
 	private listeners: Set<StateListener> = new Set();
 	private saveTimer: number | null = null;
 
@@ -34,6 +50,26 @@ export class AppState {
 
 	isSidebarCollapsed(): boolean {
 		return this.sidebarCollapsed;
+	}
+
+	getPaneSizes(): PaneSizes {
+		return { ...this.paneSizes };
+	}
+
+	updatePaneSizes(sizes: Partial<PaneSizes>) {
+		// Enforce minimum sizes
+		if (sizes.sidebarWidth !== undefined) {
+			this.paneSizes.sidebarWidth = Math.max(
+				MIN_SIDEBAR_WIDTH,
+				sizes.sidebarWidth,
+			);
+		}
+		if (sizes.editorWidth !== undefined) {
+			// Editor width is a percentage (0-100) of remaining space after sidebar
+			this.paneSizes.editorWidth = Math.max(20, Math.min(80, sizes.editorWidth));
+		}
+		this.notify();
+		this.savePaneSizes();
 	}
 
 	loadTemplate(template: Template) {
@@ -97,13 +133,21 @@ export class AppState {
 			editorContent: this.editorContent,
 			variableValues: this.variableValues,
 			sidebarCollapsed: this.sidebarCollapsed,
+			paneSizes: this.paneSizes,
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 	}
 
+	private savePaneSizes() {
+		localStorage.setItem(PANE_SIZES_KEY, JSON.stringify(this.paneSizes));
+	}
+
 	restore(templates: Template[]) {
 		const saved = localStorage.getItem(STORAGE_KEY);
-		if (!saved) return;
+		if (!saved) {
+			this.restorePaneSizes();
+			return;
+		}
 
 		try {
 			const data: AppStateData = JSON.parse(saved);
@@ -118,9 +162,32 @@ export class AppState {
 				}
 			}
 
+			// Restore pane sizes from saved data or separate key
+			if (data.paneSizes) {
+				this.paneSizes = data.paneSizes;
+			} else {
+				this.restorePaneSizes();
+			}
+
 			this.notify();
 		} catch (error) {
 			console.error("Failed to restore state:", error);
+			this.restorePaneSizes();
+		}
+	}
+
+	private restorePaneSizes() {
+		const saved = localStorage.getItem(PANE_SIZES_KEY);
+		if (saved) {
+			try {
+				const sizes = JSON.parse(saved) as PaneSizes;
+				this.paneSizes = {
+					sidebarWidth: Math.max(MIN_SIDEBAR_WIDTH, sizes.sidebarWidth || DEFAULT_SIDEBAR_WIDTH),
+					editorWidth: Math.max(20, Math.min(80, sizes.editorWidth || DEFAULT_EDITOR_WIDTH)),
+				};
+			} catch (error) {
+				console.error("Failed to restore pane sizes:", error);
+			}
 		}
 	}
 }

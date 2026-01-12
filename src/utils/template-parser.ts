@@ -22,7 +22,7 @@ export function parseTemplate(template: string): ParsedTemplate {
 		placeholders.push({
 			start: match.index,
 			end: match.index + match[0].length,
-			name: match[1].trim(),
+			name: (match[1] ?? "").trim(),
 		});
 		match = VARIABLE_REGEX.exec(template);
 	}
